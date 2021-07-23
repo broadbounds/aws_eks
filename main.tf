@@ -15,14 +15,14 @@ resource "aws_vpc" "vpc" {
    enable_dns_hostnames = true
 }
 
-# We create a public subnet
+# We create a public subnet in 2 avaikability zones
 # Instances will have a dynamic public IP and be accessible via the internet gateway
 resource "aws_subnet" "public_subnet1" {
    depends_on = [
       aws_vpc.vpc,
    ]
    vpc_id = aws_vpc.vpc.id
-   cidr_block = "192.168.0.0/24"
+   cidr_block = "192.168.1.0/24"
    availability_zone_id = "use2-az1"
    tags = {
       Name = "public-subnet1"
@@ -35,7 +35,7 @@ resource "aws_subnet" "public_subnet2" {
       aws_vpc.vpc,
    ]
    vpc_id = aws_vpc.vpc.id
-   cidr_block = "192.168.1.0/24"
+   cidr_block = "192.168.2.0/24"
    availability_zone_id = "use2-az2"
    tags = {
       Name = "public-subnet2"
@@ -43,14 +43,14 @@ resource "aws_subnet" "public_subnet2" {
    map_public_ip_on_launch = true
 }
 
-# We create a private subnet
+# We create a private subnet in each availability zone
 # Instances will not be accessible via the internet gateway
 resource "aws_subnet" "private_subnet1" {
    depends_on = [
       aws_vpc.vpc,
    ]
    vpc_id = aws_vpc.vpc.id
-   cidr_block = "192.168.2.0/24"
+   cidr_block = "192.168.10.0/24"
    availability_zone_id = "use2-az1"
    tags = {
       Name = "private-subnet1"
@@ -62,7 +62,7 @@ resource "aws_subnet" "private_subnet2" {
       aws_vpc.vpc,
    ]
    vpc_id = aws_vpc.vpc.id
-   cidr_block = "192.168.3.0/24"
+   cidr_block = "192.168.20.0/24"
    availability_zone_id = "use2-az2"
    tags = {
       Name = "private-subnet2"
@@ -81,7 +81,7 @@ resource "aws_internet_gateway" "internet_gateway" {
    }
 }
 
-# We create a route table with target as our internet gateway and destination as "internet"
+# We create a 2 route table2 with target as our internet gateway and destination as "internet"
 # Set of rules used to determine where network traffic is directed
 resource "aws_route_table" "IG_route_table1" {
    depends_on = [
@@ -113,7 +113,7 @@ resource "aws_route_table" "IG_route_table2" {
    }
 }
 
-# We associate our route table to the public subnet
+# We associate our route table2 to each public subnet
 # Makes the subnet public because it has a route to the internet via our internet gateway
 resource "aws_route_table_association" "associate_routetable_to_public_subnet1" {
    depends_on = [
@@ -133,7 +133,7 @@ resource "aws_route_table_association" "associate_routetable_to_public_subnet2" 
    route_table_id = aws_route_table.IG_route_table2.id
 }
 
-# We create an elastic IP 
+# We create 2 elastic IPs 
 # A static public IP address that we can assign to any EC2 instance
 resource "aws_eip" "elastic_ip1" {
    vpc = true
@@ -143,7 +143,7 @@ resource "aws_eip" "elastic_ip2" {
    vpc = true
 }
 
-# We create a NAT gateway with a required public IP
+# We create 2 NAT gateways with a required public IP
 # Lives in a public subnet and prevents externally initiated traffic to our private subnet
 # Allows initiated outbound traffic to the Internet or other AWS services
 resource "aws_nat_gateway" "nat_gateway1" {
@@ -170,7 +170,7 @@ resource "aws_nat_gateway" "nat_gateway2" {
    }
 }
 
-# We create a route table with target as NAT gateway and destination as "internet"
+# We create 2 route table2 with target as one of our NAT gateways and destination as "internet"
 # Set of rules used to determine where network traffic is directed
 resource "aws_route_table" "NAT_route_table1" {
    depends_on = [
@@ -202,7 +202,7 @@ resource "aws_route_table" "NAT_route_table2" {
    }
 }
 
-# We associate our route table to the private subnet
+# We associate each route tables to one of the private subnets
 # Keeps the subnet private because it has a route to the internet via our NAT gateway 
 resource "aws_route_table_association" "associate_routetable_to_private_subnet1" {
    depends_on = [
@@ -255,9 +255,6 @@ resource "aws_eip" "bastion_elastic_ip1" {
    vpc = true
 }
 
-resource "aws_eip" "bastion_elastic_ip2" {
-   vpc = true
-}
 
 # We create an ssh key using the RSA algorithm with 4096 rsa bits
 # The ssh key always includes the public and the private key
@@ -321,44 +318,11 @@ resource "aws_eip_association" "bastion_eip_association1" {
   allocation_id = aws_eip.bastion_elastic_ip1.id
 }
 
-resource "aws_instance" "bastion_host2" {
-   depends_on = [
-      aws_security_group.sg_bastion_host,
-   ]
-   ami = "ami-077e31c4939f6a2f3"
-   instance_type = "t2.micro"
-   key_name = aws_key_pair.public_ssh_key.key_name
-   vpc_security_group_ids = [aws_security_group.sg_bastion_host.id]
-   subnet_id = aws_subnet.public_subnet2.id
-   tags = {
-      Name = "bastion host 2"
-   }
-   provisioner "file" {
-    source      = "${var.key_path}${var.private_key_name}.pem"
-    destination = "/home/ec2-user/private_ssh_key.pem"
-
-    connection {
-    type     = "ssh"
-    user     = "ec2-user"
-    private_key = tls_private_key.ssh_key.private_key_pem
-    host     = aws_instance.bastion_host2.public_ip
-    }
-  }
-}
-
-# We associate the elastic ip to our bastion host
-resource "aws_eip_association" "bastion_eip_association2" {
-  instance_id   = aws_instance.bastion_host2.id
-  allocation_id = aws_eip.bastion_elastic_ip2.id
-}
-
 # We save our bastion host ip in a file.
 resource "local_file" "ip_addresses" {
   content = <<EOF
             Bastion host 1 public ip address: ${aws_eip.bastion_elastic_ip1.public_ip}
             Bastion host 1 private ip address: ${aws_instance.bastion_host1.private_ip}
-            Bastion host 2 public ip address: ${aws_eip.bastion_elastic_ip2.public_ip}
-            Bastion host 2 private ip address: ${aws_instance.bastion_host2.private_ip}
   EOF
   filename = "${var.key_path}ip_addresses.txt"
 }
