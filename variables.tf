@@ -13,6 +13,11 @@ variable "AZ_2" {
   default = "use2-az2"
 }
 
+variable "cluster_name" {
+  description = "The name of the Amazon EKS cluster."
+  default = "my-eks-cluster"
+}
+
 variable "ec2_type" {
   description = "The type of ec2 instances to create"
   default = "t2.micro"
