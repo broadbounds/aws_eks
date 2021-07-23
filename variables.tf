@@ -8,6 +8,11 @@ variable "secret_key" {
   default     = ""
 }
 
+variable "eks_cluster_name" {
+  type        = string
+  default     = "my-eks-kluster"
+}
+
 variable "public_key_name" {
   type        = string
   default     = "ssh_public_key"
