@@ -570,3 +570,82 @@ resource "aws_autoscaling_group" "auto_scaling_wordpress_az_2" {
     aws_alb_target_group.tg_load_balancer
   ]
 }
+
+
+#######################################################################################################################################################
+## Step 2: Configuring the EKS cluster
+#######################################################################################################################################################
+
+
+resource "aws_eks_cluster" "cluster" { # Here we create the EKS cluster itself.
+  name = var.cluster_name 
+  role_arn = aws_iam_role.eks_cluster.arn # The cluster needs an IAM role to gain some permission over your AWS account
+
+  vpc_config {
+    # We pass all subnets (public and private ones). Retrieved from the AWS module before.
+    subnet_ids = concat(aws_subnet.public_subnet_1, aws_subnet.public_subnet_2, aws_subnet.private_subnet_1, aws_subnet.private_subnet_1)
+    # The cluster will have a public endpoint. We will be able to call it from the public internet 
+    endpoint_public_access = true 
+    # The cluster will have a private endpoint too. Worker nodes will be able to call the control plane without leaving the VPC. 
+    endpoint_private_access = true  
+  }
+
+  # We enable control plane components logging against Amazon Cloudwatch log group.  
+  enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"] 
+
+  # Ensure that IAM Role permissions are handled before the EKS Cluster.
+  depends_on = [
+    aws_iam_role_policy_attachment.policy-AmazonEKSClusterPolicy,
+    aws_iam_role_policy_attachment.policy-AmazonEKSVPCResourceController,
+    aws_cloudwatch_log_group.eks_cluster_control_plane_components
+  ]
+}
+
+resource "aws_iam_role" "eks_cluster" { 
+  name = "${var.eks_cluster_name}_role"
+
+  assume_role_policy = jsonencode({
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "eks.amazonaws.com"
+      }
+    }]
+    Version = "2012-10-17"
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "policy-AmazonEKSClusterPolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = aws_iam_role.eks_cluster.name
+}
+
+resource "aws_iam_role_policy_attachment" "policy-AmazonEKSVPCResourceController" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
+  role       = aws_iam_role.eks_cluster.name
+}
+
+# To log control plane components
+resource "aws_cloudwatch_log_group" "eks_cluster_control_plane_components" { 
+  name              = "/aws/eks/${var.cluster_name}/cluster"
+  retention_in_days = 7
+}
+     
+     
+# Step 4: Configuring the Kubectl CLI
+
+#resource "null_resource" "generate_kubeconfig" { # Generate a kubeconfig (needs aws cli >=1.62 and kubectl)
+
+  #provisioner "local-exec" {
+    #command = "aws eks update-kubeconfig --name ${var.cluster_name}"
+  #}
+
+  #depends_on = [aws_eks_cluster.cluster]
+#}
+
+
+
+
+
+
