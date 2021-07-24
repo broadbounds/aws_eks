@@ -362,17 +362,16 @@ resource "aws_instance" "bastion_host_2" {
   }
 }
 
-
 # We associate the elastic ip to our bastion host 1
 resource "aws_eip_association" "bastion_eip_association_1" {
-  instance_id   = aws_instance.bastion_host_1.id
-  allocation_id = aws_eip.bastion_elastic_ip_1.id
+  instance_id   = "${aws_instance.bastion_host_1.id}"
+  allocation_id = "${aws_eip.bastion_elastic_ip_1.id}"
 }
 
 # We associate the elastic ip to our bastion host 2
 resource "aws_eip_association" "bastion_eip_association_2" {
-  instance_id   = aws_instance.bastion_host_2.id
-  allocation_id = aws_eip.bastion_elastic_ip_2.id
+  instance_id   = "${aws_instance.bastion_host_2.id}"
+  allocation_id = "${aws_eip.bastion_elastic_ip_2.id}"
 }
 
 # We create a security group for our application load balancer
@@ -380,7 +379,7 @@ resource "aws_eip_association" "bastion_eip_association_2" {
 resource "aws_security_group" "sg_load_balancer" {
   name        = "security group load balancer"
   description = "Allow all inbound traffic"
-  vpc_id     = aws_vpc.vpc.id
+  vpc_id     = "${aws_vpc.vpc.id}"
 
  # HTTP access from anywhere
   ingress {
@@ -415,7 +414,6 @@ resource "aws_security_group" "sg_load_balancer" {
   ]
 }
 
-
 # We create a target group for our application load balancer
 resource "aws_alb_target_group" "tg_load_balancer" {
   name     = "target-group-load-balancer"
@@ -427,7 +425,6 @@ resource "aws_alb_target_group" "tg_load_balancer" {
     aws_vpc.vpc
   ]
 }
-
 
 # We create our application load balancer
 resource "aws_alb" "load_balancer" {
