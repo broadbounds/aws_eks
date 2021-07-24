@@ -11,6 +11,7 @@ resource "aws_vpc" "vpc" {
    instance_tenancy = "default"
    tags = {
       Name = "VPC"
+      "kubernetes.io/cluster/${var.cluster_name}" = "shared
    }
    enable_dns_hostnames = true
 }
@@ -26,6 +27,7 @@ resource "aws_subnet" "public_subnet_1" {
    availability_zone_id = var.AZ_1
    tags = {
       Name = "public-subnet-1"
+      "kubernetes.io/cluster/${var.cluster_name}" = "shared"
    }
    map_public_ip_on_launch = true
 }
@@ -42,6 +44,7 @@ resource "aws_subnet" "public_subnet_2" {
    availability_zone_id = var.AZ_2
    tags = {
       Name = "public-subnet-2"
+      "kubernetes.io/cluster/${var.cluster_name}" = "shared"
    }
    map_public_ip_on_launch = true
 }
@@ -57,6 +60,7 @@ resource "aws_subnet" "private_subnet_1" {
    availability_zone_id = var.AZ_1
    tags = {
       Name = "private-subnet-1"
+      "kubernetes.io/cluster/${var.cluster_name}" = "shared"
    }
 }
 
@@ -71,6 +75,7 @@ resource "aws_subnet" "private_subnet_2" {
    availability_zone_id = var.AZ_2
    tags = {
       Name = "private-subnet-2"
+      "kubernetes.io/cluster/${var.cluster_name}" = "shared"
    }
 }
 
@@ -582,7 +587,7 @@ resource "aws_eks_cluster" "cluster" { # Here we create the EKS cluster itself.
   role_arn = aws_iam_role.eks_cluster.arn # The cluster needs an IAM role to gain some permission over your AWS account
 
   vpc_config {
-    # We pass all subnets (public and private ones). Retrieved from the AWS module before.
+    # We pass all subnets (public and private ones).
     subnet_ids = concat(aws_subnet.public_subnet_1, aws_subnet.public_subnet_2, aws_subnet.private_subnet_1, aws_subnet.private_subnet_1)
     # The cluster will have a public endpoint. We will be able to call it from the public internet 
     endpoint_public_access = true 
@@ -635,14 +640,26 @@ resource "aws_cloudwatch_log_group" "eks_cluster_control_plane_components" {
      
 # Step 4: Configuring the Kubectl CLI
 
-#resource "null_resource" "generate_kubeconfig" { # Generate a kubeconfig (needs aws cli >=1.62 and kubectl)
+resource "null_resource" "generate_kubeconfig" { # Generate a kubeconfig (needs aws cli >=1.62 and kubectl)
 
-  #provisioner "local-exec" {
-    #command = "aws eks update-kubeconfig --name ${var.cluster_name}"
-  #}
+  provisioner "local-exec" {
+    command = "aws eks update-kubeconfig --name ${var.cluster_name}"
+  }
 
-  #depends_on = [aws_eks_cluster.cluster]
-#}
+  depends_on = [aws_eks_cluster.cluster]
+}
+
+
+# Step 5: Integrating Service Accounts with IAM role
+data "tls_certificate" "cluster" {
+  url = aws_eks_cluster.cluster.identity.0.oidc.0.issuer
+}
+
+resource "aws_iam_openid_connect_provider" "cluster" { # We need an open id connector to allow our service account to assume an IAM role
+  client_id_list = ["sts.amazonaws.com"]
+thumbprint_list = concat([data.tls_certificate.cluster.certificates.0.sha1_fingerprint], [])
+  url = aws_eks_cluster.cluster.identity.0.oidc.0.issuer
+}
 
 
 
