@@ -375,16 +375,16 @@ resource "aws_eip_association" "bastion_eip_association_2" {
   allocation_id = aws_eip.bastion_elastic_ip_2.id
 }
 
-# We save our bastion host ip in a file.
-resource "local_file" "ip_addresses" {
-  content = <<EOF
-  Bastion host 1 public ip address: ${aws_eip.bastion_elastic_ip_1.public_ip}
-  Bastion host 1 private ip address: ${aws_instance.bastion_host_1.private_ip}
-  Bastion host 2 public ip address: ${aws_eip.bastion_elastic_ip_2.public_ip}
-  Bastion host 2 private ip address: ${aws_instance.bastion_host_2.private_ip}
-  EOF
-  filename = "${var.key_path}ip_addresses.txt"
-}
+## We save our bastion host ip in a file.
+#resource "local_file" "ip_addresses" {
+  #content = <<EOF
+  #Bastion host 1 public ip address: ${aws_eip.bastion_elastic_ip_1.public_ip}
+  #Bastion host 1 private ip address: ${aws_instance.bastion_host_1.private_ip}
+  #Bastion host 2 public ip address: ${aws_eip.bastion_elastic_ip_2.public_ip}
+  #Bastion host 2 private ip address: ${aws_instance.bastion_host_2.private_ip}
+  #EOF
+  #filename = "${var.key_path}ip_addresses.txt"
+#}
 
 # We create a security group for our application load balancer
 # EC2 instances' firewall that controls incoming and outgoing traffic
